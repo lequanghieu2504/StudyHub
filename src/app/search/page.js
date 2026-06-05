@@ -19,9 +19,9 @@ export default async function SearchPage({ searchParams }) {
       <div className="card">
         <h1>Available Trains</h1>
         <form className="grid grid-cols-2" action="/search">
-          {Object.entries(currentSearchParams || {}).map(([key, value]) => (
-            ['from', 'to', 'date'].includes(key) ? <input key={key} type="hidden" name={key} defaultValue={value} /> : null
-          ))}
+          <input type="hidden" name="from" defaultValue={params.from} />
+          <input type="hidden" name="to" defaultValue={params.to} />
+          <input type="hidden" name="date" defaultValue={params.date} />
           <label>
             Seat class
             <select name="seatClass" defaultValue={params.seatClass}>

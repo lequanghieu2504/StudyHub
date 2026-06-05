@@ -8,6 +8,7 @@ export default function AdminResourcePage({ resource, title, fields }) {
   const [message, setMessage] = useState('');
 
   const endpoint = useMemo(() => `/api/admin/${resource}`, [resource]);
+  const columnKeys = rows[0] ? Object.keys(rows[0]) : [];
 
   const loadData = () => {
     fetch(endpoint)
@@ -54,12 +55,12 @@ export default function AdminResourcePage({ resource, title, fields }) {
       {rows.length > 0 && (
         <table>
           <thead>
-            <tr>{Object.keys(rows[0]).map((key) => <th key={key}>{key}</th>)}</tr>
+            <tr>{columnKeys.map((key) => <th key={key}>{key}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.id || i}>
-                {Object.keys(rows[0]).map((key) => <td key={key}>{String(row[key])}</td>)}
+            {rows.map((row) => (
+              <tr key={row.id}>
+                {columnKeys.map((key) => <td key={key}>{String(row[key])}</td>)}
               </tr>
             ))}
           </tbody>

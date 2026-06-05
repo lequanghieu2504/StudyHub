@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function PassengerInfoPage() {
   const [passengers, setPassengers] = useState([{ fullName: '', age: '', idNumber: '' }]);
+  const [error, setError] = useState('');
   const router = useRouter();
 
   const updatePassenger = (index, field, value) => {
@@ -16,7 +17,11 @@ export default function PassengerInfoPage() {
   };
 
   const continueToSummary = () => {
-    if (passengers.some((p) => !p.fullName || !p.age || !p.idNumber)) return;
+    if (passengers.some((p) => !p.fullName || !p.age || !p.idNumber)) {
+      setError('Please complete all passenger fields before continuing.');
+      return;
+    }
+    setError('');
     localStorage.setItem('booking_passengers', JSON.stringify(passengers));
     router.push('/booking/summary');
   };
@@ -41,6 +46,7 @@ export default function PassengerInfoPage() {
         </div>
       ))}
       <button type="button" className="secondary" onClick={addPassenger}>Add Passenger</button>
+      {error && <p className="error">{error}</p>}
       <button type="button" onClick={continueToSummary}>Continue to Summary</button>
     </section>
   );

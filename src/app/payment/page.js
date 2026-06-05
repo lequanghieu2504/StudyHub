@@ -10,8 +10,15 @@ export default function PaymentPage() {
 
   const payNow = async () => {
     const scheduleId = localStorage.getItem('booking_schedule_id');
-    const seatIds = JSON.parse(localStorage.getItem('booking_seat_ids') || '[]');
-    const passengers = JSON.parse(localStorage.getItem('booking_passengers') || '[]');
+    let seatIds = [];
+    let passengers = [];
+    try {
+      seatIds = JSON.parse(localStorage.getItem('booking_seat_ids') || '[]');
+      passengers = JSON.parse(localStorage.getItem('booking_passengers') || '[]');
+    } catch {
+      setError('Invalid booking session data. Please restart booking.');
+      return;
+    }
 
     const response = await fetch('/api/bookings', {
       method: 'POST',

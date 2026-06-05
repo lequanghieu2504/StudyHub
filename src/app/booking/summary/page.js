@@ -9,9 +9,15 @@ export default function BookingSummaryPage() {
 
   useEffect(() => {
     const scheduleId = localStorage.getItem('booking_schedule_id');
-    const seatIds = JSON.parse(localStorage.getItem('booking_seat_ids') || '[]');
-    const passengers = JSON.parse(localStorage.getItem('booking_passengers') || '[]');
-    if (!scheduleId || seatIds.length < 1 || passengers.length < 1) return;
+    let seatIds = [];
+    let passengers = [];
+    try {
+      seatIds = JSON.parse(localStorage.getItem('booking_seat_ids') || '[]');
+      passengers = JSON.parse(localStorage.getItem('booking_passengers') || '[]');
+    } catch {
+      return;
+    }
+    if (!scheduleId || !Array.isArray(seatIds) || !Array.isArray(passengers) || seatIds.length < 1 || passengers.length < 1) return;
 
     fetch(`/api/schedules/${scheduleId}`)
       .then((res) => res.json())

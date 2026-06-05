@@ -1,19 +1,23 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { hashPassword } from '@/lib/password';
 
 const dbPath = path.join(process.cwd(), 'raillink.sqlite');
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 
 function seedBaseData() {
-  const stationsCount = db.prepare('SELECT COUNT(*) AS count FROM stations').get().count;
-  if (stationsCount > 0) return;
-
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const now = new Date().toISOString();
+  const seeded = db
+    .prepare("INSERT OR IGNORE INTO app_meta (meta_key, meta_value) VALUES ('seeded', ?)")
+    .run(now).changes;
+  if (!seeded) return;
+
   const users = [
-    { id: randomUUID(), name: 'Admin', email: 'admin@raillink.local', password_hash: 'demo', role: 'admin' },
-    { id: randomUUID(), name: 'Demo User', email: 'user@raillink.local', password_hash: 'demo', role: 'customer' },
+    { id: randomUUID(), name: 'Admin', email: 'admin@raillink.local', password_hash: hashPassword('demo123'), role: 'admin' },
+    { id: randomUUID(), name: 'Demo User', email: 'user@raillink.local', password_hash: hashPassword('demo123'), role: 'customer' },
   ];
 
   const stations = [
@@ -41,7 +45,7 @@ function seedBaseData() {
       route_id: routes[0].id,
       departure_time: '08:00',
       arrival_time: '18:30',
-      travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      travel_date: new Date(Date.now() + MS_PER_DAY).toISOString().slice(0, 10),
       seat_class: 'Economy',
       available_seats: 28,
       price: 42,
@@ -52,7 +56,7 @@ function seedBaseData() {
       route_id: routes[1].id,
       departure_time: '09:30',
       arrival_time: '21:00',
-      travel_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
+      travel_date: new Date(Date.now() + 2 * MS_PER_DAY).toISOString().slice(0, 10),
       seat_class: 'Business',
       available_seats: 20,
       price: 64,
@@ -63,33 +67,33 @@ function seedBaseData() {
       route_id: routes[2].id,
       departure_time: '06:00',
       arrival_time: '16:15',
-      travel_date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+      travel_date: new Date(Date.now() + 3 * MS_PER_DAY).toISOString().slice(0, 10),
       seat_class: 'Economy',
       available_seats: 30,
       price: 35,
     },
   ];
 
-  const insertUser = db.prepare('INSERT INTO users (id,name,email,password_hash,role,created_at) VALUES (@id,@name,@email,@password_hash,@role,@created_at)');
+  const insertUser = db.prepare('INSERT OR IGNORE INTO users (id,name,email,password_hash,role,created_at) VALUES (@id,@name,@email,@password_hash,@role,@created_at)');
   users.forEach((u) => insertUser.run({ ...u, created_at: now }));
 
-  const insertStation = db.prepare('INSERT INTO stations (id,code,name,city) VALUES (@id,@code,@name,@city)');
+  const insertStation = db.prepare('INSERT OR IGNORE INTO stations (id,code,name,city) VALUES (@id,@code,@name,@city)');
   stations.forEach((s) => insertStation.run(s));
 
-  const insertTrain = db.prepare('INSERT INTO trains (id,name,train_type,total_seats) VALUES (@id,@name,@train_type,@total_seats)');
+  const insertTrain = db.prepare('INSERT OR IGNORE INTO trains (id,name,train_type,total_seats) VALUES (@id,@name,@train_type,@total_seats)');
   trains.forEach((t) => insertTrain.run(t));
 
-  const insertRoute = db.prepare('INSERT INTO routes (id,name,origin_station_id,destination_station_id,distance_km,train_type) VALUES (@id,@name,@origin_station_id,@destination_station_id,@distance_km,@train_type)');
+  const insertRoute = db.prepare('INSERT OR IGNORE INTO routes (id,name,origin_station_id,destination_station_id,distance_km,train_type) VALUES (@id,@name,@origin_station_id,@destination_station_id,@distance_km,@train_type)');
   routes.forEach((r) => insertRoute.run(r));
 
-  const insertPrice = db.prepare('INSERT INTO ticket_prices (id,route_id,seat_class,price) VALUES (@id,@route_id,@seat_class,@price)');
+  const insertPrice = db.prepare('INSERT OR IGNORE INTO ticket_prices (id,route_id,seat_class,price) VALUES (@id,@route_id,@seat_class,@price)');
   routes.forEach((route) => {
     insertPrice.run({ id: randomUUID(), route_id: route.id, seat_class: 'Economy', price: 35 });
     insertPrice.run({ id: randomUUID(), route_id: route.id, seat_class: 'Business', price: 60 });
   });
 
-  const insertSchedule = db.prepare('INSERT INTO schedules (id,train_id,route_id,departure_time,arrival_time,travel_date,seat_class,available_seats,price) VALUES (@id,@train_id,@route_id,@departure_time,@arrival_time,@travel_date,@seat_class,@available_seats,@price)');
-  const insertSeat = db.prepare('INSERT INTO seats (id,schedule_id,seat_number,seat_class,is_booked) VALUES (@id,@schedule_id,@seat_number,@seat_class,@is_booked)');
+  const insertSchedule = db.prepare('INSERT OR IGNORE INTO schedules (id,train_id,route_id,departure_time,arrival_time,travel_date,seat_class,available_seats,price) VALUES (@id,@train_id,@route_id,@departure_time,@arrival_time,@travel_date,@seat_class,@available_seats,@price)');
+  const insertSeat = db.prepare('INSERT OR IGNORE INTO seats (id,schedule_id,seat_number,seat_class,is_booked) VALUES (@id,@schedule_id,@seat_number,@seat_class,@is_booked)');
   schedules.forEach((schedule) => {
     insertSchedule.run(schedule);
     for (let i = 1; i <= 40; i += 1) {
@@ -198,6 +202,17 @@ function initDb() {
       paid_at TEXT NOT NULL,
       transaction_ref TEXT NOT NULL,
       FOREIGN KEY(booking_id) REFERENCES bookings(id)
+    );
+    CREATE TABLE IF NOT EXISTS booking_seats (
+      id TEXT PRIMARY KEY,
+      booking_id TEXT NOT NULL,
+      seat_id TEXT NOT NULL,
+      FOREIGN KEY(booking_id) REFERENCES bookings(id),
+      FOREIGN KEY(seat_id) REFERENCES seats(id)
+    );
+    CREATE TABLE IF NOT EXISTS app_meta (
+      meta_key TEXT PRIMARY KEY,
+      meta_value TEXT NOT NULL
     );
   `);
 

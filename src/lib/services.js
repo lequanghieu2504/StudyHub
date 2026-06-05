@@ -1,5 +1,9 @@
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import db from '@/lib/db';
+import { isUuid } from '@/lib/validation';
+
+const AVERAGE_TRAIN_SPEED_KPH = 70;
+const MAX_SEATS_PER_BOOKING = 8;
 
 export function listStations() {
   return db.prepare('SELECT * FROM stations ORDER BY city, name').all();
@@ -51,7 +55,7 @@ export function searchSchedules({ from, to, date, seatClass, trainType, sortBy =
 
   return db.prepare(query).all(...params).map((row) => ({
     ...row,
-    duration: `${Math.max(1, Math.round(row.distance_km / 70))}h`,
+    duration: `${Math.max(1, Math.round(row.distance_km / AVERAGE_TRAIN_SPEED_KPH))}h`,
   }));
 }
 
@@ -81,6 +85,10 @@ export function createBooking({ userId, scheduleId, seatIds, passengers, payment
   const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(scheduleId);
   if (!schedule) throw new Error('Schedule not found');
   if (!seatIds?.length) throw new Error('At least one seat is required');
+  if (seatIds.length > MAX_SEATS_PER_BOOKING) throw new Error(`Maximum ${MAX_SEATS_PER_BOOKING} seats allowed per booking`);
+  if (!Array.isArray(seatIds) || seatIds.some((id) => !isUuid(id))) {
+    throw new Error('Invalid seat selection');
+  }
 
   const freeSeatCount = db
     .prepare(`SELECT COUNT(*) AS count FROM seats WHERE schedule_id = ? AND id IN (${seatIds.map(() => '?').join(',')}) AND is_booked = 0`)
@@ -88,7 +96,17 @@ export function createBooking({ userId, scheduleId, seatIds, passengers, payment
   if (freeSeatCount !== seatIds.length) throw new Error('One or more selected seats are unavailable');
 
   const bookingId = randomUUID();
-  const bookingCode = `RL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  let bookingCode = '';
+  let attempts = 0;
+  while (attempts < 10) {
+    bookingCode = `RL-${randomBytes(3).toString('hex').toUpperCase()}`;
+    attempts += 1;
+    const existingBooking = db.prepare('SELECT id FROM bookings WHERE booking_code = ?').get(bookingCode);
+    if (!existingBooking) break;
+  }
+  if (attempts >= 10 && db.prepare('SELECT id FROM bookings WHERE booking_code = ?').get(bookingCode)) {
+    throw new Error('Unable to generate booking code');
+  }
   const totalPrice = schedule.price * seatIds.length;
 
   const tx = db.transaction(() => {
@@ -99,7 +117,11 @@ export function createBooking({ userId, scheduleId, seatIds, passengers, payment
     const insertPassenger = db.prepare(
       'INSERT INTO passengers (id,booking_id,full_name,age,id_number) VALUES (?, ?, ?, ?, ?)'
     );
+    const insertBookingSeat = db.prepare(
+      'INSERT INTO booking_seats (id,booking_id,seat_id) VALUES (?, ?, ?)'
+    );
     passengers.forEach((p) => insertPassenger.run(randomUUID(), bookingId, p.fullName, Number(p.age || 0), p.idNumber));
+    seatIds.forEach((seatId) => insertBookingSeat.run(randomUUID(), bookingId, seatId));
 
     db.prepare(`UPDATE seats SET is_booked = 1 WHERE schedule_id = ? AND id IN (${seatIds.map(() => '?').join(',')})`).run(
       scheduleId,
@@ -141,18 +163,40 @@ export function listUserBookings(userId) {
 
 export function cancelBooking(bookingId, userId) {
   const booking = db
-    .prepare('SELECT id,status FROM bookings WHERE id = ? AND user_id = ?')
+    .prepare('SELECT id,status,schedule_id FROM bookings WHERE id = ? AND user_id = ?')
     .get(bookingId, userId);
   if (!booking) throw new Error('Booking not found');
   if (booking.status === 'CANCELLED') return booking;
-  db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run('CANCELLED', bookingId);
+
+  const seatIds = db.prepare('SELECT seat_id FROM booking_seats WHERE booking_id = ?').all(bookingId);
+
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run('CANCELLED', bookingId);
+    if (seatIds.length > 0) {
+      db.prepare(`UPDATE seats SET is_booked = 0 WHERE id IN (${seatIds.map(() => '?').join(',')})`).run(
+        ...seatIds.map((row) => row.seat_id)
+      );
+      db.prepare('UPDATE schedules SET available_seats = available_seats + ? WHERE id = ?').run(
+        seatIds.length,
+        booking.schedule_id
+      );
+    }
+  });
+  tx();
   return db.prepare('SELECT id,status FROM bookings WHERE id = ?').get(bookingId);
 }
 
 export function getAdminTable(resource) {
-  const allowed = ['stations', 'routes', 'trains', 'schedules', 'ticket_prices', 'bookings'];
-  if (!allowed.includes(resource)) throw new Error('Unsupported resource');
-  return db.prepare(`SELECT * FROM ${resource} LIMIT 100`).all();
+  const queries = {
+    stations: 'SELECT * FROM stations LIMIT 100',
+    routes: 'SELECT * FROM routes LIMIT 100',
+    trains: 'SELECT * FROM trains LIMIT 100',
+    schedules: 'SELECT * FROM schedules LIMIT 100',
+    ticket_prices: 'SELECT * FROM ticket_prices LIMIT 100',
+    bookings: 'SELECT * FROM bookings LIMIT 100',
+  };
+  if (!queries[resource]) throw new Error('Unsupported resource');
+  return db.prepare(queries[resource]).all();
 }
 
 export function createAdminResource(resource, payload) {
@@ -184,7 +228,14 @@ export function createAdminResource(resource, payload) {
   const entry = map[resource];
   if (!entry) throw new Error('Resource cannot be created');
 
-  db.prepare(`INSERT INTO ${resource} (${entry.cols.join(',')}) VALUES (${entry.cols.map(() => '?').join(',')})`).run(...entry.vals);
+  const insertStatements = {
+    stations: 'INSERT INTO stations (id,code,name,city) VALUES (?, ?, ?, ?)',
+    trains: 'INSERT INTO trains (id,name,train_type,total_seats) VALUES (?, ?, ?, ?)',
+    routes: 'INSERT INTO routes (id,name,origin_station_id,destination_station_id,distance_km,train_type) VALUES (?, ?, ?, ?, ?, ?)',
+    schedules: 'INSERT INTO schedules (id,train_id,route_id,departure_time,arrival_time,travel_date,seat_class,available_seats,price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ticket_prices: 'INSERT INTO ticket_prices (id,route_id,seat_class,price) VALUES (?, ?, ?, ?)',
+  };
+  db.prepare(insertStatements[resource]).run(...entry.vals);
   return { id };
 }
 
