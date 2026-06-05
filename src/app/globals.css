@@ -1,0 +1,166 @@
+:root {
+  --primary: #0a5ad8;
+  --secondary: #f3f6fb;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --success: #047857;
+  --danger: #b91c1c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: #f8fafc;
+}
+
+.container {
+  width: min(1100px, 92vw);
+  margin: 0 auto;
+}
+
+.navbar {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  gap: 16px;
+}
+
+.brand {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+input,
+select,
+button,
+textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.95rem;
+}
+
+button,
+.btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+.btn.secondary,
+button.secondary {
+  background: #374151;
+}
+
+.btn.danger,
+button.danger {
+  background: var(--danger);
+}
+
+h1, h2, h3 {
+  margin: 8px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  padding: 8px;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.success {
+  color: var(--success);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(40px, 1fr));
+  gap: 8px;
+}
+
+.seat {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  background: #fff;
+}
+
+.seat.booked {
+  background: #fee2e2;
+}
+
+.seat.selected {
+  background: #dbeafe;
+}
+
+@media (max-width: 768px) {
+  .navbar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 0;
+  }
+}
