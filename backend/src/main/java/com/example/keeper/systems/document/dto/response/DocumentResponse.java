@@ -16,6 +16,7 @@ public class DocumentResponse {
     private String fileType;
     private String resourceType;
     private String previewUrl;
+    private String thumbnailUrl;
     private String downloadUrl;
     private String mimeType;
     private String visibility;
