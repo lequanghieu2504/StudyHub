@@ -17,9 +17,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 
 
+import java.util.HashMap;
 import java.util.Map;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 
 
@@ -38,7 +41,7 @@ public class AiFlashcardController {
 
 
     @PostMapping(value = "/generate") // Bỏ luôn consumes đi cho dễ chịu
-    public ResponseEntity<?> generate(
+    public CompletableFuture<ResponseEntity<?>> generate(
             @RequestParam(value = "document", required = false) MultipartFile file,
             @RequestParam(value = "text", required = false) String text
     ) {
@@ -49,12 +52,15 @@ public class AiFlashcardController {
         System.out.println("=============================");
 
         try {
-            var result = aiFlashcardService.generateFlashcards(file, text);
-            return ResponseEntity.ok(Map.of("success", true, "data", result));
+            return aiFlashcardService.generateFlashcardsAsync(file, text)
+                    .thenApply(result -> ResponseEntity.ok(Map.of("success", true, "data", result)))
+                    .exceptionally(e -> ResponseEntity.internalServerError().body(
+                            Map.of("success", false, "message", unwrapMessage(e))
+                    ));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(
+            return CompletableFuture.completedFuture(ResponseEntity.internalServerError().body(
                     Map.of("success", false, "message", e.getMessage())
-            );
+            ));
         }
     }
 
@@ -130,9 +136,9 @@ public class AiFlashcardController {
 
     @GetMapping("/sets/latest")
     public ResponseEntity<?> getLatestSet() {
-        return ResponseEntity.ok(
-                Map.of("data", Map.of("id", UUID.randomUUID(), "title", "Latest Flashcards"))
-        );
+        Map<String, Object> body = new HashMap<>();
+        body.put("data", aiFlashcardService.getLatestSetByUser().orElse(null));
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/sets/{id}/publish")
@@ -151,5 +157,13 @@ public class AiFlashcardController {
     @GetMapping("/course/{courseId}")
     public ResponseEntity<?> getCourseFlashcardSets(@PathVariable UUID courseId) {
         return ResponseEntity.ok(Map.of("data", aiFlashcardService.getCourseFlashcardSets(courseId)));
+    }
+
+    private String unwrapMessage(Throwable throwable) {
+        Throwable cause = throwable;
+        while (cause instanceof CompletionException && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause.getMessage() != null ? cause.getMessage() : "Failed to generate flashcards";
     }
 }

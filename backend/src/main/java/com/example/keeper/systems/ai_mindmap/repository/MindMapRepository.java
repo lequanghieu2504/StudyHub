@@ -4,6 +4,7 @@ import com.example.keeper.systems.ai_mindmap.entity.MindMap;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,5 +13,7 @@ public interface MindMapRepository
         extends JpaRepository<MindMap, UUID> {
 
     Optional<MindMap> findByDocumentId(UUID documentId);
+    Optional<MindMap> findFirstByDocumentIdOrderByUpdatedAtDesc(UUID documentId);
+    List<MindMap> findByDocumentIdOrderByUpdatedAtDesc(UUID documentId);
 
 }

@@ -33,9 +33,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 @Service
@@ -93,8 +98,20 @@ public class AiFlashcardService {
         return docs.stream().map(doc -> Map.<String, Object>of(
                 "id", doc.getId(),
                 "title", doc.getOriginalFileName() != null ? doc.getOriginalFileName() : "Untitled",
-                "courseCode", "General"
+                "courseCode", doc.getCourse() != null && doc.getCourse().getCode() != null
+                        ? doc.getCourse().getCode()
+                        : "General"
         )).collect(Collectors.toList());
+    }
+
+    public Optional<Map<String, Object>> getLatestSetByUser() {
+        User user = getAuthenticatedUser();
+        return flashcardSetRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId())
+                .map(set -> Map.<String, Object>of(
+                        "id", set.getId(),
+                        "title", set.getTitle() != null ? set.getTitle() : "Untitled",
+                        "cards", flashcardRepository.countByFlashcardSetId(set.getId())
+                ));
     }
 
     public Map<String, Object> getSetDetailsById(UUID setId) {
@@ -173,9 +190,7 @@ public class AiFlashcardService {
         List<FlashcardSet> sets = flashcardSetRepository.findByCourseIdAndStatus(courseId, "PUBLISHED");
         
         return sets.stream().map(set -> {
-            long cardCount = flashcardRepository.findAll().stream()
-                    .filter(c -> c.getFlashcardSet() != null && c.getFlashcardSet().getId().equals(set.getId()))
-                    .count();
+            long cardCount = flashcardRepository.countByFlashcardSetId(set.getId());
 
             return Map.<String, Object>of(
                     "id", set.getId(),
@@ -189,25 +204,55 @@ public class AiFlashcardService {
     // 2. HÀM GENERATE FLASHCARD TỪ AI
     // ====================================================================
 
-    public Map<String, Object> generateFlashcards(MultipartFile file, String text) throws Exception {
+    public CompletableFuture<Map<String, Object>> generateFlashcardsAsync(MultipartFile file, String text) throws IOException {
+        UploadedFileContent uploadedFile = null;
+        if (file != null && !file.isEmpty()) {
+            uploadedFile = new UploadedFileContent(file.getOriginalFilename(), file.getBytes());
+        }
 
+        User user = getAuthenticatedUser();
+        UploadedFileContent stableUploadedFile = uploadedFile;
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return generateFlashcardsFromUpload(stableUploadedFile, text, user);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        });
+    }
+
+    public Map<String, Object> generateFlashcards(MultipartFile file, String text) throws Exception {
+        UploadedFileContent uploadedFile = null;
+        if (file != null && !file.isEmpty()) {
+            uploadedFile = new UploadedFileContent(file.getOriginalFilename(), file.getBytes());
+        }
+
+        return generateFlashcardsFromUpload(uploadedFile, text, getAuthenticatedUser());
+    }
+
+    private Map<String, Object> generateFlashcardsFromUpload(UploadedFileContent file, String text, User user) throws Exception {
         String content = text != null ? text : "";
         Document linkedDocument = null;
 
-        if (file != null && !file.isEmpty()) {
-            String name = file.getOriginalFilename().toLowerCase();
+        if (file != null && file.originalFilename() != null) {
+            String name = file.originalFilename().toLowerCase();
 
             if (name.endsWith(".pdf")) {
-                content += new PDFTextStripper().getText(Loader.loadPDF(file.getBytes()));
+                try (var pdf = Loader.loadPDF(file.bytes())) {
+                    content += new PDFTextStripper().getText(pdf);
+                }
             } else if (name.endsWith(".docx")) {
-                content += new XWPFWordExtractor(new XWPFDocument(file.getInputStream())).getText();
+                try (var document = new XWPFDocument(new ByteArrayInputStream(file.bytes()));
+                     var extractor = new XWPFWordExtractor(document)) {
+                    content += extractor.getText();
+                }
             } else {
-                content += new String(file.getBytes());
+                content += new String(file.bytes());
             }
 
             linkedDocument = documentRepository.findAll().stream()
                     .filter(doc -> doc.getOriginalFileName() != null &&
-                            doc.getOriginalFileName().equalsIgnoreCase(file.getOriginalFilename()))
+                            doc.getOriginalFileName().equalsIgnoreCase(file.originalFilename()))
                     .findFirst()
                     .orElse(null);
         }
@@ -222,8 +267,8 @@ public class AiFlashcardService {
             throw new RuntimeException("Lỗi: Không tìm thấy chữ nào trong file này (File trống hoặc toàn hình ảnh).");
         }
 
-        String title = linkedDocument != null ? linkedDocument.getTitle() : (file != null ? file.getOriginalFilename() : "AI Flashcard Set");
-        return generateFlashcardsFromContent(content, title, linkedDocument);
+        String title = linkedDocument != null ? linkedDocument.getTitle() : (file != null ? file.originalFilename() : "AI Flashcard Set");
+        return generateFlashcardsFromContent(content, title, linkedDocument, user);
     }
 
     public Map<String, Object> generateFlashcardsFromDocument(UUID documentId) throws Exception {
@@ -252,10 +297,10 @@ public class AiFlashcardService {
             content = content.substring(0, 30000);
         }
 
-        return generateFlashcardsFromContent(content, document.getTitle(), document);
+        return generateFlashcardsFromContent(content, document.getTitle(), document, getAuthenticatedUser());
     }
 
-    private Map<String, Object> generateFlashcardsFromContent(String content, String title, Document linkedDocument) throws Exception {
+    private Map<String, Object> generateFlashcardsFromContent(String content, String title, Document linkedDocument, User user) throws Exception {
         // --- ĐÃ SỬA: Cập nhật prompt để ép AI đọc văn bản ---
         String raw = callGroqApi("Trích xuất các khái niệm và định nghĩa quan trọng từ văn bản sau để làm flashcard. Văn bản: \n\n" + content);
 
@@ -277,7 +322,6 @@ public class AiFlashcardService {
             throw new RuntimeException("AI did not generate valid flashcards.");
         }
 
-        User user = getAuthenticatedUser();
         FlashcardSet set = new FlashcardSet();
         set.setTitle(title != null ? title : "AI Flashcard Set");
         set.setSourceText(content);
@@ -298,6 +342,9 @@ public class AiFlashcardService {
             "id", set.getId(),
             "flashcards", cards
         );
+    }
+
+    private record UploadedFileContent(String originalFilename, byte[] bytes) {
     }
 
     private String callGroqApi(String content) {

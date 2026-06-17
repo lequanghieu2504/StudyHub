@@ -10,6 +10,7 @@ import com.example.keeper.systems.ai_mindmap.repository.MindMapRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +25,7 @@ public class MindMapServiceImpl implements MindMapService {
     private final ObjectMapper objectMapper;
 
     @Override
+    @Transactional
     public MindMapResponse generate(UUID documentId) {
 
         List<DocumentChunk> chunks =
@@ -47,12 +49,22 @@ public class MindMapServiceImpl implements MindMapService {
 
         validateJson(aiResponse);
 
-        MindMap mindMap = MindMap.builder()
-                .documentId(documentId)
-                .title("Generated MindMap")
-                .content(aiResponse)
-                .status(MindMapStatus.COMPLETED)
-                .build();
+        List<MindMap> existingMindMaps =
+                mindMapRepository.findByDocumentIdOrderByUpdatedAtDesc(documentId);
+
+        MindMap mindMap = existingMindMaps.isEmpty()
+                ? MindMap.builder()
+                        .documentId(documentId)
+                        .title("Generated MindMap")
+                        .build()
+                : existingMindMaps.get(0);
+
+        if (existingMindMaps.size() > 1) {
+            mindMapRepository.deleteAll(existingMindMaps.subList(1, existingMindMaps.size()));
+        }
+
+        mindMap.setContent(aiResponse);
+        mindMap.setStatus(MindMapStatus.COMPLETED);
 
         mindMapRepository.save(mindMap);
 
@@ -63,7 +75,7 @@ public class MindMapServiceImpl implements MindMapService {
     public MindMapResponse getByDocument(UUID documentId) {
 
         MindMap mindMap =
-                mindMapRepository.findByDocumentId(documentId)
+                mindMapRepository.findFirstByDocumentIdOrderByUpdatedAtDesc(documentId)
                         .orElseThrow(() ->
                                 new RuntimeException("MindMap not found"));
 

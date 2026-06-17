@@ -158,7 +158,11 @@ public class DocumentController {
     @GetMapping("/my-documents")
     public ResponseEntity<?> getMyDocuments() {
 
-        List<Map<String, Object>> data = documentService.getAll()
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        List<Map<String, Object>> data = documentService.getMyUploads(email)
                 .stream()
                 .map(doc -> {
 
@@ -169,7 +173,9 @@ public class DocumentController {
                             ? doc.getTitle()
                             : "Untitled");
 
-                    item.put("course", "SWP391");
+                    item.put("course", doc.getCourse() != null && doc.getCourse().getCode() != null
+                            ? doc.getCourse().getCode()
+                            : "General");
 
                     return item;
                 })
