@@ -14,9 +14,9 @@ public interface ConversationService {
 
     List<AiConversation> getUserConversations(UUID userId, UUID projectId);
 
-    AiConversation getConversation(UUID id);
+    AiConversation getConversation(UUID id, UUID userId);
 
-    void deleteConversation(UUID id);
+    void deleteConversation(UUID id, UUID userId);
 
-    List<AiMessage> getConversationMessages(UUID conversationId);
+    List<AiMessage> getConversationMessages(UUID conversationId, UUID userId);
 }

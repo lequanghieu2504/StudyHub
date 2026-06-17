@@ -20,6 +20,8 @@ import com.example.keeper.systems.document.repository.DocumentRepository;
 import com.example.keeper.systems.document.service.DocumentDiscoveryService;
 import com.example.keeper.systems.project.entity.Project;
 import com.example.keeper.systems.project.repository.ProjectRepository;
+import com.example.keeper.systems.auth.entity.User;
+import com.example.keeper.systems.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +45,7 @@ public class AiAskServiceImpl implements AiAskService {
             "Mình có thể trả lời câu hỏi dựa trên các tài liệu trong workspace này. Nếu nguồn không hỗ trợ câu trả lời, mình sẽ nói rõ là không thể trả lời từ nguồn workspace.";
 
     private final ConversationService conversationService;
+    private final UserRepository userRepository;
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
     private final DocumentChunkRepository documentChunkRepository;
@@ -55,11 +58,18 @@ public class AiAskServiceImpl implements AiAskService {
     @Override
     @Transactional
     public AskAIResponse ask(AskAIRequest request) {
+        User user = null;
+        if (request.getConversationId() != null || (request.getProjectId() != null && (request.getShareToken() == null || request.getShareToken().isBlank()))) {
+            String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+        }
+
         AiConversation conversation = null;
         List<AiMessage> history = new ArrayList<>();
 
         if (request.getConversationId() != null) {
-            conversation = conversationService.getConversation(request.getConversationId());
+            conversation = conversationService.getConversation(request.getConversationId(), user.getId());
 
             if (request.getDocumentId() != null && conversation.getDocumentId() == null) {
                 conversation.setDocumentId(request.getDocumentId());
@@ -98,7 +108,7 @@ public class AiAskServiceImpl implements AiAskService {
                 return buildResponse(conversation, deterministicResponse, List.of());
             }
 
-            boolean hasRelevantProjectContext = appendProjectContext(prompt, request, sources);
+            boolean hasRelevantProjectContext = appendProjectContext(prompt, request, user, sources);
             if (!hasRelevantProjectContext) {
                 appendNoRelevantProjectContextInstruction(prompt);
             }
@@ -237,9 +247,10 @@ public class AiAskServiceImpl implements AiAskService {
     private boolean appendProjectContext(
             StringBuilder prompt,
             AskAIRequest request,
+            User user,
             List<AskAIResponse.SourceReference> sources
     ) {
-        Project project = resolveProject(request);
+        Project project = resolveProject(request, user);
 
         prompt.append("You are operating inside the Project Workspace: ").append(project.getName()).append("\n");
         prompt.append("Respond in the same language as the user's latest message.\n");
@@ -455,14 +466,19 @@ public class AiAskServiceImpl implements AiAskService {
                 .build());
     }
 
-    private Project resolveProject(AskAIRequest request) {
+    private Project resolveProject(AskAIRequest request, User user) {
         if (request.getShareToken() != null && !request.getShareToken().isBlank()) {
             return projectRepository.findByShareToken(request.getShareToken())
                     .orElseThrow(() -> new RuntimeException("Project not found or invalid shared link"));
         }
 
-        return projectRepository.findById(request.getProjectId())
+        Project project = projectRepository.findById(request.getProjectId())
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        if (user == null || !project.getOwner().getId().equals(user.getId())) {
+            throw new RuntimeException("You do not have permission to access this project");
+        }
+        return project;
     }
 
     private void ensureReadyForAi(Document document) {

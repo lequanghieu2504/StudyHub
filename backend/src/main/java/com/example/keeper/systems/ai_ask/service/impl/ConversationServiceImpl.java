@@ -58,23 +58,28 @@ public class ConversationServiceImpl
     }
 
     @Override
-    public AiConversation getConversation(UUID id) {
-
-        return conversationRepository
+    public AiConversation getConversation(UUID id, UUID userId) {
+        AiConversation conversation = conversationRepository
                 .findById(id)
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Conversation not found"
                         ));
+        if (!conversation.getUserId().equals(userId)) {
+            throw new RuntimeException("You do not have permission to access this conversation");
+        }
+        return conversation;
     }
 
     @Override
-    public void deleteConversation(UUID id) {
-        conversationRepository.deleteById(id);
+    public void deleteConversation(UUID id, UUID userId) {
+        AiConversation conversation = getConversation(id, userId);
+        conversationRepository.delete(conversation);
     }
 
     @Override
-    public List<AiMessage> getConversationMessages(UUID conversationId) {
+    public List<AiMessage> getConversationMessages(UUID conversationId, UUID userId) {
+        getConversation(conversationId, userId);
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
     }
 }

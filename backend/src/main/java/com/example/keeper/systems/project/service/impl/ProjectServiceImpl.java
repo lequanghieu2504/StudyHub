@@ -128,9 +128,17 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional(readOnly = true)
-    public ProjectDetailResponse getById(UUID id) {
+    public ProjectDetailResponse getById(UUID id, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        if (!project.getOwner().getId().equals(user.getId())) {
+            throw new RuntimeException("You do not have permission to access this project");
+        }
+
         return mapToResponse(project);
     }
 

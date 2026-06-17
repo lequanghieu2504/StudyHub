@@ -13,5 +13,5 @@ public interface ProjectService {
     void delete(UUID projectId, String userEmail);
     ProjectDetailResponse getByShareToken(String token);
     List<ProjectDetailResponse> getMyProjects(String userEmail);
-    ProjectDetailResponse getById(UUID id);
+    ProjectDetailResponse getById(UUID id, String userEmail);
 }

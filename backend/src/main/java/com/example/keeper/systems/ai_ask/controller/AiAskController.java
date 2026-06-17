@@ -80,7 +80,11 @@ public class AiAskController {
     public ResponseEntity<List<AiMessage>> getMessages(
             @PathVariable UUID id
     ) {
-        List<AiMessage> messages = conversationService.getConversationMessages(id);
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<AiMessage> messages = conversationService.getConversationMessages(id, user.getId());
         return ResponseEntity.ok(messages);
     }
 
@@ -88,7 +92,11 @@ public class AiAskController {
     public ResponseEntity<Void> deleteConversation(
             @PathVariable UUID id
     ) {
-        conversationService.deleteConversation(id);
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        conversationService.deleteConversation(id, user.getId());
         return ResponseEntity.ok().build();
     }
 }

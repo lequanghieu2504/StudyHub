@@ -32,7 +32,8 @@ public class ProjectController {
 
     @GetMapping("/{id}")
     public ProjectDetailResponse getById(@PathVariable UUID id) {
-        return projectService.getById(id);
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return projectService.getById(id, email);
     }
 
     @PostMapping("/{projectId}/documents/{documentId}")
