@@ -8,7 +8,7 @@ Tài liệu này phân loại các công việc cần thực hiện theo 3 mức
 
 Đây là những lỗi nghiêm trọng ảnh hưởng trực tiếp tới tính an toàn của hệ thống, bảo mật dữ liệu người dùng, hoặc có thể gây treo hệ thống (OOM) khi chạy thực tế.
 
-### 1. Sửa lỗi IDOR (Truy cập chéo dữ liệu trái phép)
+### 1. [ĐÃ HOÀN THÀNH] Sửa lỗi IDOR (Truy cập chéo dữ liệu trái phép)
 *   **Vấn đề:** 
     *   [ProjectServiceImpl.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/project/service/impl/ProjectServiceImpl.java#L131): Hàm `getById(UUID id)` lấy dữ liệu dự án mà không kiểm tra xem User hiện tại có phải chủ nhân dự án đó không.
     *   [ConversationServiceImpl.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_ask/service/impl/ConversationServiceImpl.java#L61): Hàm `getConversation` và `getConversationMessages` không kiểm chứng quyền sở hữu đoạn chat.
@@ -16,7 +16,7 @@ Tài liệu này phân loại các công việc cần thực hiện theo 3 mức
     *   Lấy ID của user đang đăng nhập từ `SecurityContextHolder`.
     *   So sánh `currentUser.getId()` với `project.getOwner().getId()` hoặc `conversation.getUserId()`. Nếu không khớp, trả về lỗi `403 Forbidden`.
 
-### 2. Sửa lỗi cấu hình Spring Security (Hở API nhạy cảm)
+### 2. [ĐÃ HOÀN THÀNH] Sửa lỗi cấu hình Spring Security (Hở API nhạy cảm)
 *   **Vấn đề:** 
     *   Trong [SecurityConfig.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/config/SecurityConfig.java#L84), dòng cấu hình `/api/courses/**` được set là `permitAll()` vô tình mở công khai toàn bộ các request POST/DELETE đến tài nguyên này (bao gồm cả API follow/unfollow môn học).
 *   **Giải pháp:** 
@@ -26,9 +26,9 @@ Tài liệu này phân loại các công việc cần thực hiện theo 3 mức
         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
         ```
 
-### 3. Khắc phục rò rỉ bộ nhớ (Out of Memory - OOM) tại Flashcard Service
+### 3. [ĐÃ HOÀN THÀNH] Khắc phục rò rỉ bộ nhớ (Out of Memory - OOM) tại Flashcard Service
 *   **Vấn đề:** 
-    *   Trong [AiFlashcardService.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_flashcard/service/AiFlashcardService.java#L80), hàm `flashcardRepository.findAll()` được gọi để lấy tất cả flashcard trong hệ thống lên RAM của server Java, sau đó dùng filter stream để đếm hoặc lọc theo bộ set.
+    *   Trong [AiFlashcardService.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_flashcard/service/impl/AiFlashcardService.java#L80), hàm `flashcardRepository.findAll()` được gọi để lấy tất cả flashcard trong hệ thống lên RAM của server Java, sau đó dùng filter stream để đếm hoặc lọc theo bộ set.
 *   **Giải pháp:** 
     *   Không sử dụng `findAll()`.
     *   Khai báo các câu query tương ứng trong `FlashcardRepository`:
@@ -37,14 +37,14 @@ Tài liệu này phân loại các công việc cần thực hiện theo 3 mức
         List<Flashcard> findByFlashcardSetId(UUID setId);
         ```
 
-### 4. Chia tách OTP kích hoạt tài khoản và OTP Reset mật khẩu
+### 4. [ĐÃ HOÀN THÀNH] Chia tách OTP kích hoạt tài khoản và OTP Reset mật khẩu
 *   **Vấn đề:** 
     *   [AuthService.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/auth/service/AuthService.java#L33): Cả hai luồng Signup OTP và Forgot Password OTP đều ghi đè chung một trường `resetToken` trong bảng User, đồng thời không giới hạn thời gian hiệu lực (OTP Expiration).
 *   **Giải pháp:**
     *   Tách thực thể User thành hai trường: `signupOtp` và `resetPasswordOtp`.
     *   Thêm hai trường timestamp: `signupOtpExpiry` và `resetPasswordOtpExpiry`. Kiểm tra xem thời gian hiện tại đã vượt quá hạn dùng của OTP chưa trước khi thực hiện xác thực.
 
-### 5. Cấu hình động URL chuyển hướng Google OAuth2
+### 5. [ĐÃ HOÀN THÀNH] Cấu hình động URL chuyển hướng Google OAuth2
 *   **Vấn đề:** 
     *   Trong [SecurityConfig.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/config/SecurityConfig.java#L159), URL điều hướng frontend sau khi đăng nhập Google thành công đang bị hardcode cứng là `http://localhost:5173/oauth2/callback`. Điều này sẽ làm lỗi tính năng đăng nhập khi deploy lên môi trường Production thực tế.
 *   **Giải pháp:**
