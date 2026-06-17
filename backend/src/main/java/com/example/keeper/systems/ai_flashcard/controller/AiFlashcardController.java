@@ -53,7 +53,7 @@ public class AiFlashcardController {
 
         try {
             return aiFlashcardService.generateFlashcardsAsync(file, text)
-                    .thenApply(result -> ResponseEntity.ok(Map.of("success", true, "data", result)))
+                    .<ResponseEntity<?>>thenApply(result -> ResponseEntity.ok(Map.of("success", true, "data", result)))
                     .exceptionally(e -> ResponseEntity.internalServerError().body(
                             Map.of("success", false, "message", unwrapMessage(e))
                     ));
