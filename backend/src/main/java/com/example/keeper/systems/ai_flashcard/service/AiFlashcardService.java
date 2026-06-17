@@ -76,15 +76,12 @@ public class AiFlashcardService {
         List<FlashcardSet> sets = flashcardSetRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
 
         return sets.stream().map(set -> {
-            // Đếm số lượng flashcard thực tế thuộc về Set này
-            long cardCount = flashcardRepository.findAll().stream()
-                    .filter(c -> c.getFlashcardSet() != null && c.getFlashcardSet().getId().equals(set.getId()))
-                    .count();
+            long cardCount = flashcardRepository.countByFlashcardSetId(set.getId());
 
             return Map.<String, Object>of(
                     "id", set.getId(),
                     "title", set.getTitle() != null ? set.getTitle() : "Untitled",
-                    "cards", cardCount // <--- Đã thay số 0 thành biến đếm thực tế
+                    "cards", cardCount
             );
         }).collect(Collectors.toList());
     }
@@ -104,10 +101,7 @@ public class AiFlashcardService {
         FlashcardSet set = flashcardSetRepository.findById(setId)
                 .orElseThrow(() -> new RuntimeException("Flashcard Set not found"));
 
-        List<Flashcard> cards = flashcardRepository.findAll()
-                .stream()
-                .filter(c -> c.getFlashcardSet() != null && c.getFlashcardSet().getId().equals(setId))
-                .collect(Collectors.toList());
+        List<Flashcard> cards = flashcardRepository.findByFlashcardSetId(setId);
 
         return Map.of(
                 "id", set.getId(),

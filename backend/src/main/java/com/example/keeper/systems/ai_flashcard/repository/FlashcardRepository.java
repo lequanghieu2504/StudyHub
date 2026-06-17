@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface FlashcardRepository extends JpaRepository<Flashcard, UUID> {
 
     List<Flashcard> findByFlashcardSetId(UUID setId);
+    long countByFlashcardSetId(UUID setId);
 }
