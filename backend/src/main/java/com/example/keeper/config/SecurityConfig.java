@@ -78,18 +78,7 @@ public class SecurityConfig {
                                                                 "/api/auth/**",
                                                                 "/oauth2/**",
                                                                 "/login/oauth2/**",
-
                                                                 "/api/embedding/**",
-
-                                                                "/api/courses",
-                                                                "/api/courses/**",
-                                                                "/api/languages",
-                                                                "/api/languages/**",
-                                                                "/api/schools",
-                                                                "/api/schools/**",
-                                                                "/api/tags",
-                                                                "/api/tags/**",
-
                                                                 "/api/projects/shared/**",
                                                                 "/api/ai/shared/ask",
                                                                 
