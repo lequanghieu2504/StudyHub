@@ -53,6 +53,29 @@ public class FileStorageService {
         }
     }
 
+    public String uploadImageBytes(byte[] bytes, String folder, String publicId) {
+        if (bytes == null || bytes.length == 0) {
+            return null;
+        }
+
+        String safePublicId = sanitizeFileName(publicId == null || publicId.isBlank() ? "thumbnail" : publicId);
+        try {
+            Map<String, Object> uploadResult = cloudinary.uploader().upload(
+                    bytes,
+                    ObjectUtils.asMap(
+                            "folder", folder,
+                            "public_id", safePublicId,
+                            "resource_type", "image",
+                            "format", "jpg",
+                            "overwrite", true));
+
+            Object secureUrl = uploadResult.get("secure_url");
+            return secureUrl == null ? null : secureUrl.toString();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to upload thumbnail to Cloudinary", exception);
+        }
+    }
+
     public void deleteFile(String publicId, String resourceType) {
         if (publicId == null || publicId.isBlank()) {
             return;

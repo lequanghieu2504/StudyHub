@@ -20,9 +20,14 @@ import com.example.keeper.systems.tag.entity.Tag;
 import com.example.keeper.systems.tag.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.text.Normalizer;
@@ -91,6 +96,10 @@ public class DocumentServiceImpl implements DocumentService {
                         resourceType,
                         extension));
 
+        if (document.getThumbnailUrl() == null || document.getThumbnailUrl().isBlank()) {
+            document.setThumbnailUrl(resolveThumbnailUrl(file, publicId, resourceType));
+        }
+
         document.setDownloadUrl(
                 fileStorageService.generateDownloadUrl(
                         publicId,
@@ -136,6 +145,47 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         return savedDocument;
+    }
+
+    private String resolveThumbnailUrl(MultipartFile file, String publicId, String resourceType) {
+        String contentType = file.getContentType();
+        if (contentType != null && contentType.startsWith("image/")) {
+            return fileStorageService.generatePreviewUrl(publicId, resourceType, null);
+        }
+
+        String filename = file.getOriginalFilename();
+        boolean isPdf = contentType != null && contentType.equalsIgnoreCase("application/pdf")
+                || filename != null && filename.toLowerCase().endsWith(".pdf");
+        if (!isPdf) {
+            return null;
+        }
+
+        try {
+            byte[] thumbnailBytes = renderFirstPdfPage(file.getBytes());
+            String thumbnailPublicId = publicId == null || publicId.isBlank()
+                    ? resolveTitle(file) + "-cover"
+                    : publicId + "-cover";
+            return fileStorageService.uploadImageBytes(thumbnailBytes, "document-thumbnails", thumbnailPublicId);
+        } catch (Exception exception) {
+            log.warn("Failed to generate PDF thumbnail. Filename: {}, Error: {}",
+                    filename,
+                    exception.getMessage());
+            return null;
+        }
+    }
+
+    private byte[] renderFirstPdfPage(byte[] pdfBytes) throws IOException {
+        try (var pdfDocument = Loader.loadPDF(pdfBytes);
+             var outputStream = new ByteArrayOutputStream()) {
+            if (pdfDocument.getNumberOfPages() == 0) {
+                return null;
+            }
+
+            PDFRenderer renderer = new PDFRenderer(pdfDocument);
+            BufferedImage image = renderer.renderImageWithDPI(0, 144, ImageType.RGB);
+            javax.imageio.ImageIO.write(image, "jpg", outputStream);
+            return outputStream.toByteArray();
+        }
     }
 
     private Document buildDocument(CreateDocumentRequest request) {
@@ -404,6 +454,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .description(document.getDescription())
                 .fileUrl(document.getFileUrl())
                 .previewUrl(previewUrl)
+                .thumbnailUrl(document.getThumbnailUrl())
                 .downloadUrl(downloadUrl)
                 .fileType(resolveFileType(document))
                 .resourceType(resourceType)
@@ -448,6 +499,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .fileType(resolveFileType(document))
                 .resourceType(resourceType)
                 .previewUrl(previewUrl)
+                .thumbnailUrl(document.getThumbnailUrl())
                 .downloadUrl(downloadUrl)
                 .mimeType(document.getMimeType())
                 .visibility(document.getVisibility() == null
