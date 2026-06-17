@@ -32,6 +32,18 @@ public class User extends BaseEntity {
 
     private String resetToken;
 
+    @Column(name = "signup_otp")
+    private String signupOtp;
+
+    @Column(name = "signup_otp_expiry")
+    private java.time.LocalDateTime signupOtpExpiry;
+
+    @Column(name = "reset_password_otp")
+    private String resetPasswordOtp;
+
+    @Column(name = "reset_password_otp_expiry")
+    private java.time.LocalDateTime resetPasswordOtpExpiry;
+
     @Column(name = "email_verified")
     private boolean emailVerified = false;
 

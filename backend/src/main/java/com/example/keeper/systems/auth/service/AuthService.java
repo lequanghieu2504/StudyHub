@@ -30,7 +30,8 @@ public class AuthService {
         user.setEmailVerified(false);
 
         String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
-        user.setResetToken(otp);
+        user.setSignupOtp(otp);
+        user.setSignupOtpExpiry(java.time.LocalDateTime.now().plusMinutes(5));
 
         userRepository.save(user);
 
@@ -69,7 +70,8 @@ public class AuthService {
 
         String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
 
-        user.setResetToken(otp);
+        user.setResetPasswordOtp(otp);
+        user.setResetPasswordOtpExpiry(java.time.LocalDateTime.now().plusMinutes(5));
         userRepository.save(user);
 
         try {
@@ -86,12 +88,16 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found!"));
 
-        if (user.getResetToken() == null || !user.getResetToken().equals(otp)) {
-            throw new RuntimeException("Invalid OTP!");
+        if (user.getResetPasswordOtp() == null || 
+            !user.getResetPasswordOtp().equals(otp) ||
+            user.getResetPasswordOtpExpiry() == null ||
+            user.getResetPasswordOtpExpiry().isBefore(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("Invalid or expired OTP!");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setResetToken(null);
+        user.setResetPasswordOtp(null);
+        user.setResetPasswordOtpExpiry(null);
         userRepository.save(user);
 
         return "Password updated successfully!";
@@ -101,19 +107,26 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email not found!"));
 
-        return user.getResetToken() != null && user.getResetToken().equals(otp);
+        return user.getResetPasswordOtp() != null && 
+               user.getResetPasswordOtp().equals(otp) &&
+               user.getResetPasswordOtpExpiry() != null &&
+               !user.getResetPasswordOtpExpiry().isBefore(java.time.LocalDateTime.now());
     }
 
     public String verifySignupOtp(String email, String otp) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email not found!"));
 
-        if (user.getResetToken() == null || !user.getResetToken().equals(otp)) {
-            throw new RuntimeException("Invalid OTP!");
+        if (user.getSignupOtp() == null || 
+            !user.getSignupOtp().equals(otp) ||
+            user.getSignupOtpExpiry() == null ||
+            user.getSignupOtpExpiry().isBefore(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("Invalid or expired OTP!");
         }
 
         user.setEmailVerified(true);
-        user.setResetToken(null);
+        user.setSignupOtp(null);
+        user.setSignupOtpExpiry(null);
         userRepository.save(user);
 
         return "Account verified successfully!";
@@ -128,7 +141,8 @@ public class AuthService {
         }
 
         String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
-        user.setResetToken(otp);
+        user.setSignupOtp(otp);
+        user.setSignupOtpExpiry(java.time.LocalDateTime.now().plusMinutes(5));
         userRepository.save(user);
 
         try {
