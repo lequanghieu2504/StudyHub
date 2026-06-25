@@ -30,6 +30,7 @@ import useDocuments from "@/hooks/useDocuments";
 import axiosClient from "@/api/axiosClient";
 import { getMyProjects, deleteProject } from "@/api/projectApi";
 import CreateProjectModal from "@/components/projects/CreateProjectModal";
+import DocumentThumbnail from "@/components/documents/DocumentThumbnail";
 import { forceDownload } from "@/lib/downloadHelper";
 import { toast } from "react-hot-toast";
 
@@ -304,9 +305,11 @@ export default function MyLibrary() {
                   className="rounded-xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-all overflow-hidden p-4 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-orange-50 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-[#f26522]" />
-                    </div>
+                    <DocumentThumbnail
+                      document={doc}
+                      className="w-12 h-14 rounded-lg border border-slate-200 shrink-0"
+                      iconClassName="w-6 h-6 text-[#f26522]"
+                    />
                     <div>
                       <Link to={`/documents/${doc.id}`} className="block">
                         <h4 className="font-bold text-slate-800 text-sm hover:text-[#f26522] transition-colors">
@@ -378,9 +381,7 @@ export default function MyLibrary() {
                   className="shadow-sm border-slate-100 hover:shadow-md transition-all group flex flex-col h-full rounded-[20px] overflow-hidden bg-white border"
                 >
                   <CardContent className="p-4 flex-1 flex flex-col">
-                    <div className="w-full aspect-[4/3] bg-slate-50 rounded-xl mb-3 border border-slate-200 flex items-center justify-center text-slate-300">
-                      <FileText className="w-12 h-12" />
-                    </div>
+                    <DocumentThumbnail document={doc} />
                     <CardTitle
                       className="text-[15px] mb-1 font-bold text-slate-800 line-clamp-1"
                       title={doc.title}

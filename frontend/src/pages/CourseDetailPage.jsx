@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { forceDownload } from "@/lib/downloadHelper";
+import DocumentThumbnail from "@/components/documents/DocumentThumbnail";
 import { CardTitle } from "@/components/ui/card";
 import { CardDescription } from "@/components/ui/card";
 import { CardFooter } from "@/components/ui/card";
@@ -233,10 +234,10 @@ export default function CourseDetailPage() {
               className="shadow-sm border-slate-100 hover:shadow-md transition-all group flex flex-col h-full rounded-[20px] overflow-hidden bg-white"
             >
               <CardContent className="p-4 flex-1 flex flex-col">
-                {/* Thumbnail ảo mờ mờ cho đẹp */}
-                <div className="w-full aspect-[4/3] bg-slate-50 rounded-xl mb-3 -mt-4 border border-slate-200 group-hover:border-[#f26522]/20 transition-colors flex items-center justify-center text-slate-300">
-                  <FileText className="w-12 h-12" />
-                </div>
+                <DocumentThumbnail
+                  document={doc}
+                  className="w-full aspect-[4/3] rounded-xl mb-3 -mt-4 border border-slate-200 group-hover:border-[#f26522]/20 transition-colors"
+                />
 
                 <CardTitle
                   className="text-[15px] mb-1 font-bold text-slate-800 line-clamp-1"
