@@ -57,7 +57,7 @@ Tài liệu này phân loại các công việc cần thực hiện theo 3 mức
 
 Các cải tiến nhằm đảm bảo luồng nghiệp vụ hoạt động trơn tru, logic trả về dữ liệu chính xác và giao diện không bị giật lag/timeout.
 
-### 1. Thay thế dữ liệu mock trong API lấy bộ Flashcards mới nhất
+### 1. [ĐÃ HOÀN THÀNH] Thay thế dữ liệu mock trong API lấy bộ Flashcards mới nhất
 *   **Vấn đề:** 
     *   [AiFlashcardController.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_flashcard/controller/AiFlashcardController.java#L131): API `/sets/latest` đang trả về dữ liệu mock với UUID ngẫu nhiên, khiến frontend click vào bị lỗi 404.
 *   **Giải pháp:** 
@@ -66,21 +66,21 @@ Các cải tiến nhằm đảm bảo luồng nghiệp vụ hoạt động trơn
         Optional<FlashcardSet> findFirstByUserIdOrderByCreatedAtDesc(UUID userId);
         ```
 
-### 2. Sửa lỗi API "Tài liệu của tôi"
+### 2. [ĐÃ HOÀN THÀNH] Sửa lỗi API "Tài liệu của tôi"
 *   **Vấn đề:** 
     *   [DocumentController.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/document/controller/DocumentController.java#L158): API `/my-documents` lấy toàn bộ tài liệu hệ thống thay vì lọc theo cá nhân và đang bị hardcode tên môn học `"SWP391"`.
 *   **Giải pháp:** 
     *   Sử dụng email người dùng từ context để gọi hàm lấy tài liệu đã upload của riêng họ.
     *   Lấy tên môn học thực tế từ thuộc tính `document.getCourse().getCode()` thay vì hardcode chuỗi ký tự.
 
-### 3. Khắc phục lỗi Crash 500 khi tạo trùng lặp Sơ đồ tư duy (Mindmap)
+### 3. [ĐÃ HOÀN THÀNH] Khắc phục lỗi Crash 500 khi tạo trùng lặp Sơ đồ tư duy (Mindmap)
 *   **Vấn đề:** 
     *   [MindMapServiceImpl.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_mindmap/service/MindMapServiceImpl.java#L27): Cho phép sinh nhiều Mindmap trên cùng 1 `documentId`. Tuy nhiên khi load, hàm `findByDocumentId` lại trả về một đối tượng đơn lẻ (`Optional`), gây lỗi `NonUniqueResultException` khi có nhiều hơn 1 bản ghi.
 *   **Giải pháp:**
     *   Trước khi lưu sơ đồ tư duy mới, kiểm tra xem đã tồn tại sơ đồ cho tài liệu đó chưa.
     *   Nếu đã tồn tại, tiến hành ghi đè cập nhật nội dung (Update) hoặc xóa bản cũ trước khi lưu bản mới.
 
-### 4. Chuyển tác vụ parse văn bản trực tiếp sang Bất đồng bộ (Async)
+### 4. [ĐÃ HOÀN THÀNH] Chuyển tác vụ parse văn bản trực tiếp sang Bất đồng bộ (Async)
 *   **Vấn đề:** 
     *   Trong [AiFlashcardService.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_flashcard/service/AiFlashcardService.java#L198), khi người dùng tải file lên để tạo Flashcard tức thời, việc parse chữ từ file PDF/Word chạy đồng bộ trên thread chính của Tomcat, dễ gây timeout/lag khi file nặng.
 *   **Giải pháp:** 
