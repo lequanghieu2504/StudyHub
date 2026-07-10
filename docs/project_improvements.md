@@ -92,7 +92,7 @@ Các cải tiến nhằm đảm bảo luồng nghiệp vụ hoạt động trơn
 
 Những nâng cấp giúp tăng tốc độ xử lý, giảm chi phí gọi API bên ngoài (Groq, Jina) và giúp mã nguồn dễ bảo trì hơn.
 
-### 1. Khắc phục lỗi JSON Injection trong Jina API Client
+### 1. [ĐÃ HOÀN THÀNH] Khắc phục lỗi JSON Injection trong Jina API Client
 *   **Vấn đề:**
     *   [JinaEmbeddingClient.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_ask/client/JinaEmbeddingClient.java#L24): Chuỗi JSON gửi tới Jina API được nối bằng Text Block thủ công dạng String. Nếu text chứa các ký tự xuống dòng (`\n`) hoặc ký tự đặc biệt chưa được escape, Jina API sẽ trả về lỗi `400 Bad Request`.
 *   **Giải pháp:**
@@ -105,20 +105,20 @@ Những nâng cấp giúp tăng tốc độ xử lý, giảm chi phí gọi API 
         String json = objectMapper.writeValueAsString(requestBody);
         ```
 
-### 2. Sử dụng Batch Embedding thay vì gọi REST API tuần tự
+### 2. [ĐÃ HOÀN THÀNH] Sử dụng Batch Embedding thay vì gọi REST API tuần tự
 *   **Vấn đề:** 
     *   [DocumentParserService.java](file:///data/qtram/swp391-project/backend/src/main/java/com/example/keeper/systems/ai_ask/service/DocumentParserService.java#L131): Gọi API Jina AI tuần tự từng chunk một qua vòng lặp. Nếu tài liệu có 50 chunks, hệ thống gọi API 50 lần tuần tự.
 *   **Giải pháp:** 
     *   Chuyển đầu vào `EmbeddingService` thành nhận một danh sách `List<String> texts`.
     *   Gửi một mảng chuỗi văn bản tới Jina AI trong một HTTP Request duy nhất, sau đó map kết quả danh sách vector trả về tương ứng.
 
-### 3. Cấu hình động thông số phân mảnh tài liệu (Chunk Size)
+### 3. [ĐÃ HOÀN THÀNH] Cấu hình động thông số phân mảnh tài liệu (Chunk Size)
 *   **Vấn đề:** 
     *   Thông số `CHUNK_SIZE = 1000` và `CHUNK_OVERLAP = 200` đang bị định nghĩa cố định (hardcode) trong code.
 *   **Giải pháp:** 
     *   Chuyển các giá trị này ra file `application.properties` để dễ dàng tinh chỉnh độ dài ngữ cảnh phù hợp cho mô hình AI mà không cần phải compile lại code.
 
-### 4. Thêm cơ chế Rate Limiting cho API AI
+### 4. [ĐÃ HOÀN THÀNH] Thêm cơ chế Rate Limiting cho API AI
 *   **Vấn đề:** 
     *   Các endpoint sinh Quiz, Flashcard, Mindmap, Hỏi AI hoạt động miễn phí và không giới hạn lượt gọi, rất dễ bị người dùng spam làm cạn kiệt API key Groq/Jina.
 *   **Giải pháp:**

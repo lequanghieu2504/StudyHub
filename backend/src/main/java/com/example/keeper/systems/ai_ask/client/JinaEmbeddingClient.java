@@ -7,11 +7,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class JinaEmbeddingClient {
 
     private final OkHttpClient client = new OkHttpClient();
+    private final ObjectMapper objectMapper;
+
+    public JinaEmbeddingClient(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${jina.api.key}")
     private String apiKey;
@@ -20,21 +28,25 @@ public class JinaEmbeddingClient {
             "https://api.jina.ai/v1/embeddings";
 
     public float[] embed(String text) throws IOException {
-
-        String escapedText =
-                text.replace("\\", "\\\\")
-                        .replace("\"", "\\\"");
-
-        String json = """
-        {
-          "model":"jina-embeddings-v5-text-small",
-          "task":"retrieval.query",
-          "normalized":true,
-          "input":[
-            "%s"
-          ]
+        List<float[]> embeddings = embedAll(List.of(text));
+        if (embeddings.isEmpty()) {
+            throw new RuntimeException("Jina response did not include an embedding");
         }
-        """.formatted(escapedText);
+        return embeddings.get(0);
+    }
+
+    public List<float[]> embedAll(List<String> texts) throws IOException {
+        if (texts == null || texts.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Object> requestBody = Map.of(
+                "model", "jina-embeddings-v5-text-small",
+                "task", "retrieval.query",
+                "normalized", true,
+                "input", texts
+        );
+        String json = objectMapper.writeValueAsString(requestBody);
 
         System.out.println("===== JINA REQUEST =====");
         System.out.println(json);
@@ -75,32 +87,35 @@ public class JinaEmbeddingClient {
                 );
             }
 
-            ObjectMapper mapper =
-                    new ObjectMapper();
-
             JsonNode root =
-                    mapper.readTree(body);
+                    objectMapper.readTree(body);
 
-            JsonNode embeddingNode =
-                    root.path("data")
-                            .get(0)
-                            .path("embedding");
+            JsonNode dataNode = root.path("data");
+            if (!dataNode.isArray()) {
+                throw new RuntimeException("Jina response data is not an array");
+            }
 
-            float[] vector =
-                    new float[embeddingNode.size()];
+            List<float[]> vectors = new ArrayList<>();
+            for (JsonNode itemNode : dataNode) {
+                JsonNode embeddingNode = itemNode.path("embedding");
+                float[] vector =
+                        new float[embeddingNode.size()];
 
-            for (int i = 0; i < embeddingNode.size(); i++) {
-                vector[i] =
-                        embeddingNode.get(i)
-                                .floatValue();
+                for (int i = 0; i < embeddingNode.size(); i++) {
+                    vector[i] =
+                            embeddingNode.get(i)
+                                    .floatValue();
+                }
+
+                vectors.add(vector);
             }
 
             System.out.println(
-                    "Embedding dimension = "
-                            + vector.length
+                    "Embedding count = "
+                            + vectors.size()
             );
 
-            return vector;
+            return vectors;
         }
     }
 }

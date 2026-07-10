@@ -8,6 +8,7 @@ import com.example.keeper.systems.auth.service.JwtService;
 import com.example.keeper.systems.auth.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -28,6 +29,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final AiRateLimitFilter aiRateLimitFilter;
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
@@ -154,7 +156,8 @@ public class SecurityConfig {
 
                             response.sendRedirect(redirectUrl);
                         }))
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(aiRateLimitFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -179,5 +182,13 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public FilterRegistrationBean<AiRateLimitFilter> aiRateLimitFilterRegistration(
+            AiRateLimitFilter filter) {
+        FilterRegistrationBean<AiRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

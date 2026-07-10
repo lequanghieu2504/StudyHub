@@ -10,6 +10,7 @@ import org.apache.poi.xslf.extractor.XSLFExtractor;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -27,7 +28,11 @@ public class DocumentParserService {
     private final DocumentChunkRepository documentChunkRepository;
     private final EmbeddingService embeddingService;
 
-    private static final int CHUNK_SIZE = 1500; // max characters per chunk
+    @Value("${app.ai.document.chunk-size:1500}")
+    private int chunkSize;
+
+    @Value("${app.ai.document.chunk-overlap:200}")
+    private int chunkOverlap;
 
     public boolean parseAndChunkDocument(byte[] fileBytes, String originalFilename, String contentType, UUID documentId) {
         if (fileBytes == null || fileBytes.length == 0) {
@@ -108,41 +113,91 @@ public class DocumentParserService {
     }
 
     private void chunkAndSaveText(String fullText, UUID documentId) {
-        // Simple chunking strategy based on character count and words
-        String[] words = fullText.split("\\s+");
-        
-        StringBuilder currentChunk = new StringBuilder();
-        List<String> chunks = new ArrayList<>();
-        
-        for (String word : words) {
-            if (currentChunk.length() + word.length() + 1 > CHUNK_SIZE) {
-                // save current chunk
-                chunks.add(currentChunk.toString());
-                currentChunk = new StringBuilder();
-            }
-            currentChunk.append(word).append(" ");
+        List<String> chunks = splitIntoChunks(fullText);
+        if (chunks.isEmpty()) {
+            log.warn("No chunks generated for document {}", documentId);
+            return;
         }
-        
-        if (currentChunk.length() > 0) {
-            chunks.add(currentChunk.toString());
+
+        List<float[]> embeddings = embeddingService.embedAll(chunks);
+        if (embeddings.size() != chunks.size()) {
+            throw new IllegalStateException(
+                    "Jina returned " + embeddings.size()
+                            + " embeddings for " + chunks.size() + " chunks"
+            );
         }
 
         int chunkIndex = 0;
-        for (String chunkText : chunks) {
-
-            float[] embedding =
-                    embeddingService.embed(chunkText);
-
+        List<DocumentChunk> documentChunks = new ArrayList<>();
+        for (int i = 0; i < chunks.size(); i++) {
             DocumentChunk chunk = new DocumentChunk();
 
             chunk.setDocumentId(documentId);
             chunk.setChunkIndex(chunkIndex++);
-            chunk.setContent(chunkText.trim());
-            chunk.setEmbedding(embedding);
+            chunk.setContent(chunks.get(i));
+            chunk.setEmbedding(embeddings.get(i));
 
-            documentChunkRepository.save(chunk);
+            documentChunks.add(chunk);
         }
 
+        documentChunkRepository.saveAll(documentChunks);
+
         log.info("Saved {} chunks for document {}", chunks.size(), documentId);
+    }
+
+    private List<String> splitIntoChunks(String fullText) {
+        int maxChunkSize = Math.max(1, chunkSize);
+        int overlapSize = Math.max(0, Math.min(chunkOverlap, maxChunkSize - 1));
+        String[] words = fullText.split("\\s+");
+
+        List<String> chunks = new ArrayList<>();
+        StringBuilder currentChunk = new StringBuilder();
+
+        for (String word : words) {
+            if (word.isBlank()) {
+                continue;
+            }
+
+            if (!currentChunk.isEmpty()
+                    && currentChunk.length() + word.length() + 1 > maxChunkSize) {
+                chunks.add(currentChunk.toString().trim());
+                currentChunk = buildOverlapChunk(currentChunk.toString(), overlapSize);
+            }
+
+            if (!currentChunk.isEmpty()) {
+                currentChunk.append(" ");
+            }
+            currentChunk.append(word);
+        }
+
+        if (!currentChunk.isEmpty()) {
+            chunks.add(currentChunk.toString().trim());
+        }
+
+        return chunks;
+    }
+
+    private StringBuilder buildOverlapChunk(String chunkText, int overlapSize) {
+        if (overlapSize <= 0 || chunkText.isBlank()) {
+            return new StringBuilder();
+        }
+
+        String[] words = chunkText.trim().split("\\s+");
+        StringBuilder overlap = new StringBuilder();
+
+        for (int i = words.length - 1; i >= 0; i--) {
+            int nextLength = overlap.length() + words[i].length() + (overlap.isEmpty() ? 0 : 1);
+            if (nextLength > overlapSize) {
+                break;
+            }
+
+            if (overlap.isEmpty()) {
+                overlap.insert(0, words[i]);
+            } else {
+                overlap.insert(0, words[i] + " ");
+            }
+        }
+
+        return overlap;
     }
 }

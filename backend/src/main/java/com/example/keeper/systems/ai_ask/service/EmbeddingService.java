@@ -6,6 +6,7 @@ import com.example.keeper.systems.ai_ask.repository.DocumentChunkRepository;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.List;
 
 @Service
 public class EmbeddingService {
@@ -28,6 +29,17 @@ public class EmbeddingService {
         } catch (Exception e) {
             throw new RuntimeException(
                     "Failed to generate embedding",
+                    e
+            );
+        }
+    }
+
+    public List<float[]> embedAll(List<String> texts) {
+        try {
+            return client.embedAll(texts);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to generate embeddings",
                     e
             );
         }
